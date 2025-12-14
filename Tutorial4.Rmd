@@ -1,0 +1,473 @@
+---
+title: "STAT 311 (AU25): Tutorial 4"
+author: "[Student Name Goes Here]"
+date: "`r Sys.time()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+Tutorial 4 will emphasize descriptive tools for numerical variables, but it also begins to build the conceptual scaffolding for a couple of other important concepts we will explore in greater depth this quarter:
+
++ It will introduce some basic concepts from probability theory.
++ Related to this, it will introduce basic practices in **probabilistic** or **Monte Carlo simulation** (*simulation based on pseudo-random number generation*).
++ It will begin to introduce language that statisticians use to model and communicate about cause-effect relationships between variables. Unlike an association, a **cause-effect relationship** is _a relationship between two variables in which a causal or **explanatory** variable causes (or induces, or leads to, or drives, or triggers, or makes) change in the pattern of variability of an effect or **response** variable_. Unlike the independent and dependent variables that characterize associations, the roles of cause and effect are nonarbitrary and the cause-effect relationship is nonreciprocal.^[To quote The White Stripes, "you can't take the effect and make it the cause" ("Effect and Cause," track 13 on *Icky Thump*, Warner Bros. Records and Third Man Records, 2007).]
+
+# **1. An introduction to probability theory**
+
+## *1.1. Thinking about population distributions*
+
+Recall that the **sample distribution** of a single variable comprises two related things:
+
+(1) every value of this variable present in a particular sample;
+(2) the frequency of each value of this variable in the sample.
+
+This definition can be generalized to apply to two or more variables, in which case the sample distribution comprises _every possible combination of values of two or more variables present in a particular sample, as well as the frequency of each combination_.^[In this case, we need to acknowledge that some possible combinations can have frequencies of 0.] What distinguishes **descriptive statistics** from the other major areas of statistics is its emphasis on effectively summarizing and communicating about sample distributions. It comprises a body of theory and data-analytic techniques that allow us to measure and represent various **distributional characteristics** of a sample in a way that is insightful, i.e., techniques that identify and communicate about the aggregate *pattern* of variability that exists in one or more variables in a sample.
+
+Like samples, populations---including infinite populations---have distributions. A **population distribution** can be defined as _the set of all possible values of a variable (or all possible combinations of values of two or more variables) and how frequent these are in a population_.
+
+While we ordinarily talk and think about descriptive statistics as if focusing singularly on samples, in principle we could also apply its techniques to the characterization of population distributions in the rare or artificial cases that we can actually observe every member of a target population. However, since we can almost never observe entire populations (particularly in the case of infinite populations) we instead employ a separate body of theory and set of techniques that allow us to reason and communicate about *hypothetical* or *possible* patterns of variability in populations. This is one of the core aims of another major area of statistics, **probability theory**. While probability theory and descriptive statistics do overlap to a degree, each also has some elements (concepts and techniques) that set the two apart. For example, while we assume that patterns of variability in populations are sometimes very complex, we often favor **model**s (or *simplifying approximation*s) of population distributions since in most cases we don't actually get to observe and appreciate many of their complexities. We refer to these simplifying approximations as **probability distribution models** or simply **probability models**. (Later in the quarter, we will broaden the definition of "probability model" to encompass other applications beyond modeling population distributions.)
+
+## *1.2. Probability models and sampling notation*
+
+While much of the *formal language* used by statisticians is borrowed directly from mathematics and to a degree formal logic, another important variety is what is known as **sampling notation**. Sampling notation has forms such as
+
+$$
+\tag{1}
+X \sim \text{Normal}\left(\mu,\sigma\right)
+$$
+and
+
+$$
+\tag{2}
+Y
+\sim
+\text{Binomial}\left(\theta,n\right)
+$$
+
+In these examples:
+
++ The Roman letters $X$ and $Y$ to the left of the tilde (~) serve as placeholders or abbreviations for the names of variables.
++ The functions $\text{Normal}\left(\dots\right)$ and $\text{Binomial}\left(\dots\right)$ to right of the tilde are names of probability models.
++ The arguments of each of these functions ($\mu$ and $\sigma$ for the normal model; $\theta$ and $n$ for the binomial model) are parameters that provide further information about the distributional characteristics of these models.
+
+Each of these examples of sampling notation can be read almost as if they were sentences: "The population pattern of variability in $X$ follows or has (~) a normal distribution with parameters $\mu$ and $\sigma$" or "an observed value of $Y$ comes from (~) a population whose distribution follows a binomial distribution with parameters $\theta$ and $n$."
+
+The normal model will be exemplified further in the next section. In a nutshell, this model has the following features: it is a symmetrical, unimodal distribution with a bell shape, covering unbounded continuous numerical variables. The parameter $\mu$ represents the center of the distribution (specifically, the population mean, median, and mode), while $\sigma$ is the **population standard deviation**, which describes the dispersion of the model: model distributions with larger values of $\sigma$ are more spread out. A little over 68% of cases fall within an interval $\pm 1\sigma$ around $\mu$, a little over 95% of cases fall within an interval $\pm 2\sigma$ around $\mu$, and around 99.7% of cases fall within an interval $\pm 3\sigma$ around $\mu$. The following code chunk draws a **density curve** of the normal model with $\mu=2$ and $\sigma=0.4$. You can think of a density curve as a _continuous equivalent of a histogram representing a model population distribution_. In `R`, the changing heights of density curves can be calculated with probability model functions beginning with the prefix `d`, e.g. `dnorm()` for the normal distribution, `dbinom()` for the binomial distribution, and so on.
+
+```{r}
+# Create a vector of values for a numerical variable x.
+# from x=-1 to x=5, at 0.01 intervals:
+x. <- seq(-1, 5, 0.01)
+
+# Calculate the height of the normal density curve at each
+# value of x. assuming mu=2, sigma=.4:
+p_x. <- dnorm(
+  x = x.,
+  mean = 2, sd = 0.4
+)
+
+densCurve <- data.frame(x., p_x.)
+
+densCurve %>% 
+  ggplot(mapping = aes(x = x., y = p_x.)) +
+  geom_line() +
+  xlab("x.") + ylab("p(x.)")
+```
+
+While the tails of this density curve *appear* to taper off to heights of about 0 below about x.=0.5 and above x.=3.5, in fact their height is very slightly positive out to $-\infty$ and $\infty$ (though their difference from 0 is increasingly trivial).
+
+# **2. A case study from urban economics: Household location, size, and energy consumption**
+
+Imagine a study in urban economics that aims to understand the relationship between the distance of housing units from the city core (measured in km), dwelling size (measured in $m^2$), and total household energy consumption per year (measured in kWh per year). All three variables are positive and continuous numerical variables, and in many empirical contexts their distributions are right-skewed, though becoming approximately symmetrical when log-transformed.
+
+The investigators conducting the study propose that the population distributions of all three variables are not only approximately symmetrical but well-approximated with the normal model when log-transformed:
+
+$$
+\tag{3}
+Z
+=
+\ln\left(\text{distance from city core}\right)
+\sim
+\text{Normal}\left(\mu_z,\sigma_z\right)
+$$
+
+$$
+\tag{4}
+X
+=
+\ln\left(\text{dwelling size}\right)
+\sim
+\text{Normal}\left(\mu_x,\sigma_x\right)
+$$
+
+$$
+\tag{5}
+Y
+=
+\ln\left(\text{energy consumption}\right)
+\sim
+\text{Normal}\left(\mu_y,\sigma_y\right)
+$$
+
+(Note that the parameters of each normal model, $\mu$ and $\sigma$, have been given subscripts that distinguish between different variables, e.g. $\mu_x$ for log unit size, $\sigma_y$ for log energy consumption, and so on.)
+
+The investigators also propose the following system of cause-effect relationships between $X$, $Y$, and $Z$:
+
++ Distance from the city center exerts a positive influence on dwelling size both because of looser zoning regulations farther from the city and because of lower supply and higher demand for space nearer to the city center, consequently higher per $m^2$ housing costs that in turn favor the construction of smaller domestic units near the city core (e.g., apartment buildings and complexes vs. semidetached or detached homes). Consequently, an increase in $Z$ influences an increase in $X$.
++ Unit size exerts a positive influence on total energy consumption (i.e., an increase in $X$ influences an increase in $Y$). While smaller units may be less energy efficient per $m^2$, total energy usage for larger units still tends to be higher due to sheer size differences.
++ Distance from the city center exerts a negative effect on total energy consumption because of better developed energy infrastructure and shared energy costs of attached or semidetached homes (e.g., apartments) closer to city centers. Consequently, an increase in $Z$ influences a decrease in $Y$.
+
+By implication, both unit size and distance exert separate **direct effect**s on energy use. Furthermore, distance exerts both a direct and an **indirect** or **mediated effect** on energy use, with unit size serving as a **mediator** in the latter case. The **total effect** of distance on energy use combines the direct and indirect effects of distance: On one hand, an increase in distance induces an increase in total energy use because units more distant from the city are larger and larger units expend more energy because of their size. On the other hand, an increase in distance also induces an increase in total energy use because of less well developed energy infrastructure and the relatively greater inefficiency of detached housing units. Consequently, the total effect of distance on energy use is even more positive than either of these two component effects considered separately.
+
+Models of cause-effect systems like this one are sometimes expressed with graphical models (or **causal graphs**) known as **directed acyclic graph**s (or **DAG**s for short). This particular type of causal graph takes this name for the following reasons:
+
+(a) They represent all variables in the causal system as nodes in the graph, and causes and effects are connected with arrows (or "directed edges") such that "cause" variables point to their "effect" variables. This is the meaning of "directed" in "DAG".
+(b) The overall system or network of cause-effect relationships does not include any chain of cause-effect relationships that cycles or feeds back on itself (e.g., if $X$ exerts a direct or indirect influence on $Y$, then $Y$ does not in turn exert a direct or indirect influence on $X$). This is the meaning of "acyclic" in "DAG".
+
+The chunk below uses a package known as `ggdag` that combines functionalities from `ggplot2` and another package (`dagitty`) to illustrate this kind of graphical causal model using `ggplot2` syntax. The `eval` argument in the header of this chunk is set to `TRUE` so that it will run, but you can change this to `FALSE` if you have not installed this package or encounter version incompatibilities between packages.
+
+```{r, eval=TRUE}
+library(ggdag)
+
+dagStructure <- dagify(
+  Y ~ X + Z, # Specifies Y's causal dependence on X and Z
+  X ~ Z, # Specifies X's causal dependence on Z
+  coords = data.frame( # guides the location of nodes in the DAG
+    name = c("X","Y","Z"),
+    x = c(1, 3, 2),
+    y = c(1, 1, 2)
+  )
+)
+
+ggdag(dagStructure) + theme_void() # Draw the DAG
+```
+
+Finally, the investigators conducting this study proposed the following, linear models of each normal distribution's central tendency:
+
+$$
+\tag{6}
+\mu_z
+=
+2
+$$
+
+In words, the central tendency of $Z$ is 2, corresponding with a median household distance from city center of $e^2\approx 7.39$ km.
+
+$$
+\tag{7}
+\mu_x
+=
+4.5+0.5z
+$$
+
+In words, the central tendency of $X$ is
+
++ $4.5$ when $Z=0$, corresponding with a median household size of $e^{4.5}\approx 90 \; m^2$ when the unit is exp(z=0) = 1 km from the city center.
++ $4.5+0.5\times 2=5.5$ when $Z=\mu_z=2$, corresponding with a median household size of $e^{5.5}\approx 244.7 \; m^2$ when the unit is approximately 7.39 km from the city center.
+
+Put differently, the size of the unit increases by 0.5% (the coefficient of $Z$ in the linear equation above) for each 1% increase in distance.
+
+$$
+\tag{8}
+\mu_y
+=
+6.5 + .4x + .2z
+$$
+
+In words, the central tendency of $Y$ is
+
++ $6.5$ when $X=0$ and $Z=0$, corresponding with a median energy consumption of $e^{6.5}\approx 665$ kWh annually when the unit is exp(x=0) = 1 $m^2$ in size (an absurdity) and exp(z=0) = 1 km from the city center.
++ $6.5 + .4\times 5.5 + .2\times 2=9.1$ when $Z=\mu_z=2$ and $X=4.5+0.5\mu_z=5.5$, corresponding with a median energy consumption of $e^{9.1}\approx 8955$ kWh annually when the unit is approximately 7.39 km from the city center and is approximately 244.7 $m^2$ in size.
+
+# **3. Simulating data in `R`**
+
+Monte Carlo simulation involves drawing samples of observations from populations with known characteristics, then summarizing the patterns of variability that characterize these samples. It is based on **random number generator**s (**RNG**s, though most RNGs are more accurately *pseudorandom*), which take **seeds** (*large lists of numbers whose pattern and order appear random when summarized*) as input and transform these values into values that conform to the values of the population from which the sample is drawn. For purposes of reproducibility, we often explicitly set the seed (e.g., using `set.seed()` in `R`).
+
+In `R`, drawing random samples from probability models usually  involves probability model functions beginning with the prefix `r`, e.g. `rnorm()` for the normal distribution, `rbinom()` for the binomial distribution, and so on. these functions usually include sample size arguments `n`. The chunk below draws a sample of 1000 observations of $Z$, assuming
+
+$$
+\tag{9}
+\{Z_1,Z_2,\dots,Z_n\}
+\overset{iid}{\sim}
+\text{Normal}\left(\mu=2, \sigma=0.4\right)
+$$
+
+This sampling statement can be read as follows: the value of $Z$ for each observation, from the 1st through the *n*th, is drawn independently of all others from the same population distribution: a normal distribution whose mean is 2 and standard deviation is 0.4. "**iid**" is an abbreviation for "independent and identically distributed." once $Z$ is drawn for each case, it is exponentiated to map log distance back onto the distance scale.
+
+$$
+\tag{10}
+\text{distance}_i=e^{z_i}=\exp\left(z_i\right)
+$$
+
+```{r}
+set.seed(31120254) # Choose a seed
+
+sampleSize <- 1000 # Choose sample size
+
+mu_z <- 2 # set the population mean
+sigma_z <- .4 # set the population standard deviation (sd)
+
+# random number generation
+z <- rnorm(n = sampleSize, mean = mu_z, sd = sigma_z)
+
+# antilogging Z onto the distance scale
+distance.km <- exp(z)
+```
+
+The next chunk creates a sample of $X$ according to the following sampling statement:
+
+$$
+\tag{11}
+X_i\mid Z_i
+\sim
+\text{Normal}\left(
+\mu=4.5 + 0.5z_i,
+\sigma=0.2
+\right)
+$$
+
+Here, the expression "$X_i\mid Z_i$" to the left of the tilde can be read as "variable $X$ for case $i$ conditional on variable $Z$ for case $i$ ...". This dependence of $X$ on $Z$ is expressed in the probability distribution model by expressing $\mu_x$ for individual $i$ as a linear function of $Z$ for case $i$. In this case, we cannot say $X$ is *iid* because different individuals have different normal models from each other, not identical ones. 
+
+Note that the `mean` argument of `rnorm()` in the following chunk accepts a vector of the same length as the simulated number of cases, where each element in the vector represents $\mu$ for each individual. However, all cases have the same standard deviation.
+
+```{r}
+mu_x <- 4.5 + .5*z # A vector of length 1000
+sigma_x <- .2
+
+x <- rnorm(n = sampleSize, mean = mu_x, sd = sigma_x)
+
+size.msq <- exp(x)
+```
+
+Finally, the following chunk simulates a sample of $Y$ according to the following sampling statement:
+
+$$
+\tag{12}
+Y_i\mid X_i, Z_i
+\sim
+\text{Normal}\left(
+\mu=6.5 + 0.4x_i + 0.2z_i,
+\sigma=0.25
+\right)
+$$
+
+Once again, this sampling statement asserts that the value of $Y$ for case $i$ is conditional on the values of both $X$ and $Z$ for case $i$; every case has its own $\mu_y$.
+
+```{r}
+mu_y <- 6.5 + .4*x + .2*z
+sigma_y <- .25
+
+y <- rnorm(n = sampleSize, mean = mu_y, sd = sigma_y)
+
+energy.kWh <- exp(y)
+```
+
+In the next chunk, all three variables $X$, $Y$, and $Z$, as well as distance from city center, unit size, and energy consumption are combined into a single dataset, `dat`.
+
+```{r}
+dat <- data.frame(
+  z = z,
+  x = x,
+  y = y,
+  distance.km = distance.km,
+  size.msq = size.msq,
+  energy.kWh = energy.kWh
+)
+```
+
+# **4. Describing samples for numerical variables**
+
+To create frequency distributions for single numerical variables, we can use the nested functions `table(cut())`
+
+```{r}
+table(cut(
+  dat$z,
+  breaks = seq( # `breaks` argument defines bin boundaries
+    0, # Origin at 0
+    4, # largest bin's upper boundary
+    0.25 # bin width
+  )
+))
+```
+
+Note that each bin count is labeled with interval notation, for example `(0,0.25]` means "all values from 0 (exclusive) to 0.25 (inclusive)."
+
+While frequency distributions are the foundation of histograms, we don't often represent them in research reports. Instead, they are reflected in histogram form. The following chunk constructs a histogram based on the variable $Z$:
+
+```{r}
+dat %>% 
+  ggplot(mapping = aes(x = z)) +
+  geom_histogram(
+    breaks = seq(0, 4, 0.25)
+  ) +
+  xlab("Z = ln(distance km)")
+```
+
+In the chunk below, create a frequency distribution and corresponding histogram for annual energy consumption (kWh). you might first consider using the `range()` function with this variable to identify minimum and maximum values observed for this variable when you choose appropriate breaks for the frequency distribution and histogram.
+
+```{r}
+
+```
+
+Note that the count axis (i.e., Y axis) of a histogram can be adjusted to show the proportional density of each bin rather than the count ($k$):
+
+$$
+\tag{13}
+\text{bin density}
+=
+\frac
+  {p}
+  {w}
+=
+\frac
+  {\left(\frac{k}{n}\right)}
+  {w}
+$$
+
+where $k$ is the bin count, $w$ is the bin width, $n$ is the sample size, and $p$ is the bin proportion relative to the whole sample. The following chunk redraws the histogram, this time with bar heights representing relative densities rather than counts. This also allows us to superimpose density curves so that we can evaluate how closely the sample distribution approximates the corresponding population distribution model (in this case, `p_x.` from above).
+
+```{r}
+dat %>% 
+  ggplot(mapping = aes(x = z)) +
+    geom_histogram(
+      mapping = aes(y = after_stat(density)), # bar height=density
+      breaks = seq(0, 4, 0.25)
+    ) +
+  geom_line(
+    data = densCurve,
+    mapping = aes(x = x., y = p_x.),
+    col = "#33a02c"
+  ) +
+  xlab("Z = ln(distance km)")
+```
+
+Standard summary statistics for numerical variables can be calculated using a few basic functions: `mean()` (for the sample mean, $\bar{x}$), `sd()` (for the standard deviation, $s$), `var()` (variance, $s^2$), `median()` (median, $Q_2$), and `fivenum()` (the five-number summary, $\{Q_0,Q_1,Q_2,Q_3,Q_4\}$), `range()` ($\{Q_0,Q_4\}$), and `IQR()` (interquartile range, $IQR=Q_3-Q_1$). For household size:
+
+```{r}
+mean(dat$size.msq)
+sd(dat$size.msq)
+var(dat$size.msq)
+median(dat$size.msq)
+fivenum(dat$size.msq)
+range(dat$size.msq)
+IQR(dat$size.msq)
+```
+
+We can also use these functions in the context of sample summaries using `dplyr`'s `summarize()` (or `summarise()`) function:
+
+```{r}
+dat %>% 
+  summarize(
+    mean_size = mean(size.msq),
+    sd_size = sd(size.msq),
+    median_size = median(size.msq),
+    IQR_size = IQR(size.msq)
+  )
+```
+
+Observe that the mean is greater than the median, owing to the fact that the distribution is right-skewed. Means are more sensitive to extreme values than medians. This can be illustrated graphically:
+
+```{r}
+dat %>% 
+  ggplot(mapping = aes(x = size.msq)) +
+  geom_histogram(breaks = seq(0, 600, 20)) +
+  geom_vline(xintercept = median(dat$size.msq), col = "#1b9e77") +
+  geom_vline(xintercept = mean(dat$size.msq), col = "#d95f02") +
+  xlab("unit size (m^2)")
+```
+
+Box-and-whisker plots (aka boxplots) are another kind of graph we often use to visualize the pattern of variability in numerical variables. Both histograms and box-and-whisker plots are widely used to represent patterns of variability in numerical variables, each with its own strengths and limitations. Unlike histograms, which are based on tabular summaries of numerical variables, box-and-whisker plots are instead based on the five-number summary:
+
++ The lower and upper boundaries of the box are drawn at $Q_1$ and $Q_3$, respectively, while the line dividing the box into two parts is drawn at $Q_2$.
++ The width of the box is $Q_3-Q_1=IQR$
++ Any data point less than the **lower Tukey fence** (${TF}_{lower}$ below) is an outlier and is represented as an individual dot
+
+$$
+\tag{14}
+{TF}_{upper}
+=
+Q_1-1.5IQR
+$$
+
++ Any data point greater than the **upper Tukey fence** (${TF}_{upper}$ below) is an outlier and is represented as an individual dot
+
+$$
+\tag{15}
+{TF}_{upper}
+=
+Q_3+1.5IQR
+$$
+
++ The lower whisker extends downward from the lower boundary of the box ($Q_1$) to the lowest value of $X$ excluding the outliers, so its lower extreme falls somewhere between the lower Tukey fence and $Q_1$.
++ The upper whisker extends upward from the upper boundary of the box ($Q_3$) to the highest value of $X$ excluding the outliers, so its upper extreme falls somewhere between $Q_3$ and the upper Tukey fence.
+
+The chunk below presents a box-and-whisker plot for unit size. The median, mean, and Tukey fences are also shown.
+
+```{r}
+fivenum(dat$size.msq)
+IQR(dat$size.msq)
+fivenum(dat$size.msq)[2] - 1.5*IQR(dat$size.msq) # Lower fence
+fivenum(dat$size.msq)[4] + 1.5*IQR(dat$size.msq) # Upper fence
+
+dat %>% 
+  ggplot(mapping = aes(x = size.msq)) +
+  geom_boxplot() +
+  geom_vline(xintercept = median(dat$size.msq), col = "#1b9e77") +
+  geom_vline(
+    xintercept = fivenum(dat$size.msq)[2]-1.5*IQR(dat$size.msq), 
+    col = "#1b9e77", lty = 2
+    ) +
+  geom_vline(
+    xintercept = fivenum(dat$size.msq)[4]+1.5*IQR(dat$size.msq), 
+    col = "#1b9e77", lty = 2
+    ) +
+  geom_vline(xintercept = mean(dat$size.msq), col = "#d95f02") +
+  xlab("unit size (m^2)") +
+  # The following suppresses Y axis title, labels, & ticks,
+  # which have no meaning for a boxplot
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+```
+
+We can also draw grouped box-and-whisker plots to explore the relationship between numerical and categorical variables. In this case, distance is collapsed into a two-level ordinal variable based on the median distance.
+
+```{r}
+dat$distance.ord <- factor(
+  x = ifelse(
+    test = dat$distance.km<median(dat$distance.km),
+    yes = "Near",
+    no = "Far"
+    ),
+  levels = c("Near", "Far") # Fixes the order
+  )
+
+dat %>% 
+  group_by(distance.ord) %>% 
+  summarize(
+    median_energy = median(size.msq),
+    IQR_energy = IQR(size.msq)
+  )
+
+dat %>% 
+  ggplot(mapping = aes(x = size.msq, y = distance.ord)) +
+  geom_boxplot() +
+  xlab("unit size (m^2)") +
+  ylab("Distance from city core (below/above Q2)")
+```
+
+In the chunk below, prepare one boxplot describing variability in energhy use (kWh/year) overall, and a second comparing variability in energy use for “near” and “far” households.
+
+```{r}
+
+```
+

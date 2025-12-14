@@ -1,0 +1,349 @@
+---
+title: "STAT 311 (AU25): Tutorial 5"
+author: "[Student Name Goes Here]"
+date: "`r Sys.time()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(knitr) # Used for a kable() table
+```
+
+# **1. Motivation**
+
+Tutorial 5 will introduce the basics of simple linear regression in R. Recall the following characteristics of simple linear regression:
+
++ It explores the association between two numerical variables *X* (the independent variable) and *Y* (the dependent variable).
++ Ideally, the dependent variable *Y* is a continuous unbounded numerical variable, whose distribution is assumed to be unimodal and symmetrical.
+  + Note 1: Despite this ideal, we sometimes apply simple linear regression to dependent variables that are bounded under one of two conditions: (1) observed values of *Y* fall far from the boundaries of *Y*, or (2) *Y* can be transformed using a function that maps it onto an unbounded domain such as log or logit transformation.
+  + Note 2: despite this ideal, some transformations can also make asymmetrical distributions closer to symmetrical. For example, applying log ($\log_b(y)$) functions to strictly positive, moderately right-skewed distributions will often result in approximately symmetrical distributions. Similarly, applying inverse hyperbolic sine functions ($\text{arsinh}(y)$ or $\sinh^{-1}(y)$) to unbounded, skewed numerical variables will often result in approximately symmetrical distributions, whether these are right-skewed or left-skewed (see for example [Boen et al. 2020](https://doi.org/10.1177/0022146520924811)). In R, inverse hyperbolic sine transformation can be implemented using `asinh()`.
++ It assumes that the association between *X* and *Y* can be expressed strictly in terms of how *X* predicts change in the central tendency of *Y*: $\mu_y=f(x)$. Among other things, this assumption implies that dispersion in *Y* is constant with respect to *X*: $\sigma_y\neq f(x)$ (an assumption known as homoscedasticity).
++ It assumes that the predictive relationship between *X* and $\mu_y$ is a linear function: $\mu_{y,i}=\alpha+\beta x_i$, where 
+  + $\mu_{y,i}$ is the mean or expected value of *Y* for individual *i*;
+  + $\alpha$ is the y-intercept of $\mu_y$;
+  + $\beta$ is the slope, the amount by which *Y* changes for each unit increase (+1) in *X*;
+  + $x_i$ is the value of the independent or predictor variable *X* for individual *i*.
++ It assumes that *Y* is normally distributed: $Y_i\sim\text{Normal}(\mu_y=\alpha+\beta x_i, \sigma_y)$.
++ It estimates the slope, intercept, standard deviation, and coefficients of correlation and determination in an algorithmic framework known as Ordinary Least Squares (OLS). This framework  minimizes a sample statistic known as the "residual sum of squares" (RSS, i.e. the sum of squared residuals across all individuals in the sample) by applying closed-form expressions (i.e., requiring no numerical or stochastic approximation):
+
+$$
+RSS
+=
+\sum_{i=1}^n (y_i-\hat{\mu}_{y,i})^2
+=
+\sum_{i=1}^n (y_i-(\hat{\alpha}+\hat{\beta}x_i))^2
+$$
+
+Note that simple linear regression does not explicitly pose any model for *X*, since this is the independent variable whose pattern of variability remains unmodeled by definition (i.e., ignored).
+
+Implementing this framework in R will be illustrated using a case study from the worlds of disease ecology and fisheries science, specifically fish virology.
+
+# **2. Case study in fish virology**
+
+The data and case study introduced here are based on
+
+Hernandez, Daniel G., William Brown, Kerry A. Naish, and Gael Kurath. 2021. “Virulence and Infectivity of UC, MD, and L Strains of Infectious Hematopoietic Necrosis Virus (IHNV) in Four Populations of Columbia River Basin Chinook Salmon.” Viruses 13(4): 701. https://doi.org/10.3390/v13040701
+
+This study focused on the relationship between the infectious hematopoietic necrosis virus (IHNV) and Chinook salmon (aka king salmon, *Oncorhynchus tshawytscha*) of the Columbia River Basin (CRB) of Washington State. IHNV is an RNA virus pathogenic to many salmonid fish species throughout the North American Pacific Coastal region. RNA viruses (realm: Riboveria) are a large group of viruses that also include many well-known viruses pathogenic to humans (rhinovirus, influenzaviruses, COVID-19, SARS, dengue, Ebola, and West Nile viruses). IHNV is not pathogenic for humans, but it does have an ecologically and economically important impact on salmonid populations throughout the Pacific Coast of North America.
+
+The salmonids (family: *Salmonidae*) are a family of fishes including salmon, trout, char, and grayling. Infection by IHNV causes a disease known as infectious hematopoietic necrosis (IHN) in salmonids, generally affecting salmonid juveniles. IHN is characterized by clinically detectable morbidities and an increased risk of mortality for infected juveniles. Because IHN has both important ecological and economic impacts for Pacific salmonid populations, understanding the host-virus relationship between salmonids and IHNV is urgent for government agencies tasked with managing and conserving fish, as well as for the commercial fishing industry.
+
+Like many viruses pathogenic to humans, IHNV includes several major genogroups or strains:
+
++ IHNV-L or simply L (an abbreviation for “lower”), primarily affecting salmonids of southern Oregon and California;
++ IHNV-M or simply M (an abbreviation for “middle”), affecting salmonids in the Columbia River Basin;
++ IHNV-U or simply U (an abbreviation for “upper),” affection salmonids from Oregon to Alaska.
+
+While the names of these strains suggest general differences between their geographic ranges, it is important to note that they overlap geographically, especially the U and M strains in the CRB and surrounding states and provinces. Field studies among Chinook salmon of the CRB suggest that more IHNV infections are associated with IHNV-U (>80%) than IHNV-M (<20%). However, we do not know why this imbalance by strain occurs among CRB Chinook salmon.
+
+Hernandez's study comprised a series of blocked experiments intended to identify possible explanations for the difference between U and M infection burdens among CRB Chinook. It explored the relationship between several possible explanatory variables---viral strain, exposure dose, and CRB Chinook subpopulation---and two health outcomes---viral infection (presence/absence of infection, as well as viral load for those infected) and infection virulence (evaluated coarsely as survival/mortality following exposure). Hernandez speculated that differences in infection and/or virulence between strains might account for differences in the prevalence of IHNV infection among CRB Chinook.
+
+He also evaluated whether variability in life history strategies of different CRB Chinook populations might predict differences in susceptibility to infection. Some CRB Chinook subpopulations exhibit a “stream-type” or “spring-run” life history pattern, returning from the Pacific Ocean to the fresh waters of the CRB to breed earlier in the year. Others exhibit an “ocean-type” or “fall-run” life history pattern, remaining in the Pacific for a longer period and returning to the CRB later in the year. These different behavioral phenotypes correspond with physiological differences,  and these physiological differences may in turn lead to a relatively greater susceptibility of some CRB Chinook subpopulations to IHNV infection, morbidity, and/or mortality than others.^[See the following science news story for a brief discussion of our current state of knowledge about these two life history strategies: https://www.science.org/content/article/salmon-study-sheds-light-why-fall-run-fish-are-bigger-their-spring-run-cousins]
+
+In Hernandez's infectivity study, Chinook salmon from multiple CRB populations were experimentally exposed to various doses and strains of IHNV in a lab context, and their infection status was monitored following exposure. The following chunk loads Hernandez's data from his infectivity experiment:
+
+```{r}
+fishDat <- read.csv(
+  file = "HernandezFishData.csv",
+  stringsAsFactors = TRUE
+)
+
+glimpse(fishDat)
+```
+
++ `Population` is a nominal variable distinguishing between four CRB Chinook populations:
+  + Methow River (abbreviated `MT`)
+  + Hanford Reach Priest Rapids Hatchery (abbreviated `PR`)
+  + North Santiam River (abbreviated `NS`)
+  + Cowlitz River (abbreviated `CW`)
++ `RunType` is a dichotomous nominal variable distinguishing between `Spring/Stream` type and `Fall/Ocean` Chinook life history strategies.
++ `CRB` is a dichotomous ordinal variable distinguishing between `Lower` CRB Chinook populations (downstream, i.e. west of the Cascade Mountains) and `Upper` populations (upstream, i.e. east of the Cascade Mountains).
++ `Strain` is a nominal variable distinguishing between `L`, `M`, and `U` viral strains to which the experimental fish were exposed (`L` is included as a positive control, since this IHNV strain is not endemic to the CRB but is known to be highly infectious).
++ `Dose` is a continuous numerical variable identifying the dose of IHNV to which experimental fish were exposed. Each fish was exposed at one of four experimental doses: $2\times10^2$, $2\times10^3$, $2\times10^4$, and $2\times10^5$ plaque-forming units per mL (PFU mL^-1^). Doses reported in `Dose` are log~10~ transformed: $\log_{10}(2\times 10^2)\approx 2.3$, $\log_{10}(2\times 10^3)\approx 3.3$, $\log_{10}(2\times 10^4)\approx 4.3$, and $\log_{10}(2\times 10^5)\approx 5.3$.
++ `Infection` is an ordinal presence/absence indicator variable indicating whether the experiment fish was infected with IHNV following exposure.
++ `LogViralLoad` is a log-transformed continuous numerical measure of the amount of virus recovered from the bodies of those fish that had been infected (log~10~ RNA copies per gram).
+
+This dataset is broken up into four "blocks" according to all possible combinations of life history strategy ("stream/spring" vs. "ocean/fall" type) and CRB population source (lower vs. upper CRB). Individual fish within each block were "challenged" by exposure to one of twelve possible combinations of viral strain (L, M, and U) and log~10~ viral dose (2.3, 3.3, 4.3, and 5.3). In total, there are $4\times12=48$ possible combinations of block and challenge type. The sample comprises 8 fish per block-challenge combination, for a total sample of $n=(2\times2)_{blocks}\times(3\times4)_{challenges}\times8_{fish}=384$
+
+The block below quantifies these with a four-way table, expressed as if a one-way table using `group_by()`:
+
+```{r}
+kable(
+  fishDat %>%
+  group_by(RunType, CRB, Strain, Dose) %>% 
+  summarize(`Fish Count` = n())
+)
+```
+
+The explanatory or treatment variable "log exposure dose" is uninteresting because this variable is intentionally manipulated and the sample is balanced by experimental intervention on this variable. Note that in the following block, dose is coerced to a categorical variable using the `as.factor()` function and the histogram is drawn using the `geom_bar()` rather than `geom_histogram()` function. While dose is a continuous numerical variable, the fact that only four doses on a log~10~ scale were administered actually makes this pseudo bar plot better behaved than a histogram, which would require unneccessary consideration of origin and bin width (i.e., where to "break" the histogram).
+
+```{r}
+fishDat %>% 
+  ggplot(mapping = aes(x = as.factor(Dose))) +
+  geom_bar() +
+  xlab("Viral Exposure Dose")
+```
+
+In contrast, the response variables "infection" (an indicator) and "log viral load" are more interesting:
+
+```{r}
+fishDat %>%
+  ggplot(mapping = aes(x = as.factor(Infection))) +
+  geom_bar() +
+  xlab("Infection")
+
+fishDat %>%
+  filter(!is.na(LogViralLoad)) %>% #Omit NAs for uninfected fish
+  ggplot(mapping = aes(x = LogViralLoad)) +
+  geom_histogram(breaks = seq(3,9,0.5)) +
+  xlim(3, 9) +
+  xlab("Log Viral Load")
+```
+
+We might also ask whether the distribution in log viral load varies according to the log exposure dose:
+
+```{r}
+fishDat %>%
+  filter(!is.na(LogViralLoad)) %>% #Omit NAs for uninfected fish
+  ggplot(mapping = aes(x = LogViralLoad)) +
+  geom_histogram(breaks = seq(3,9,1)) +
+  xlim(3, 9) +
+  xlab("Log Viral Load") +
+  facet_wrap(~Dose)
+```
+
+We can also draw a scatterplot:
+
+```{r}
+fishDat %>% 
+  filter(!is.na(LogViralLoad)) %>% 
+  ggplot(mapping = aes(
+    x = jitter(Dose, factor = .25),
+    y = LogViralLoad
+    )) +
+  geom_point() +
+  xlab("Log Viral Exposure Dose") +
+  ylab("Log Viral load")
+```
+
+Note that the *X* variable has been "jittered". This introduces random noise so that the values of *X* are deliberately (but only slightly) misrepresented so that it is easier to mitigate the problem of overlapping points that sometimes troubles scatterplots. The `factor` argument in `jitter()` controls the degree of random noise in this misreport.
+
+The following scatterplot uses the `col` argument in the `aes()` functoin to color-code the scatterplot according to CRB population (west or downstream vs. east or upstream):
+
+```{r}
+fishDat %>% 
+  filter(!is.na(LogViralLoad)) %>% 
+  ggplot(mapping = aes(
+    x = jitter(Dose, factor = 0.25),
+    y = LogViralLoad,
+    col = CRB
+    )) +
+  geom_point() +
+  xlab("Log Viral Exposure Dose") +
+  ylab("Log Viral load")
+```
+
+In the chunk below, prepare a scatterplot of viral dose and viral load as above, but code according to one of the other categorical variabes. Also, change the `factor` argument in `jitter()` so you can observe the effect of this on the degree of noise in *X*. If you include the `pch` argument in the `aes()` function and set it to equal (`=`) another variable, this will shape-code the scatterplot, as well. Add this argument to `aes()` in the chunk below to change the shape of the points to reflect one of the other categorical variables. (`pch` is an abbreviation for "point character".)
+
+```{r}
+
+```
+
+
+# **3. R simple linear regression**
+
+Simple linear regression imagines the relationship between independent and dependent variable can be summarized at the population level based on a handful of parameters:
+
++ $\mu_y$: Mean of $Y$, which has a linear relationship with $X$: $\mu_{y,i}=\alpha+\beta x_i$;
++ $\alpha$: Y-intercept of $\mu_y$ (i.e., the value of $\mu_y$ when $x_i=0$);
++ $\beta$: the slope of $X$, i.e., the amount by which $\mu_y$ changes for each unit increase (+1) in $X$;
++ $\sigma_y$: the constant dispersion (expressed as a standard deviation) of $Y$ conditional on knowing $X$. This parameter has no relationship with $X$.
++ $\rho$: The correlation coefficient, ranging between -1 and 1. Negative values indicate a negative linear relationship between $X$ and $Y$ ($\mu_y$ decreases as $X$ increases), while positive vlaues indicate a positive linear relationship ($\mu_y$ increases as $X$ increases). $\rho=0$ indicates a "null" direction ($\mu_y$ does not change as $X$ increases). Values of $\rho$ further away from 0 (i.e., toward -1 or +1) indicate stronger relationships.
++ $\rho^2$: The "coefficient of determination" (though "determination" is misleading if we are talking about associations rather than cause-effect relationships). This parameter varies between 0 and 1 and constitutes a proportional measure of how much variance in $Y$ ($\sigma_y^2$) is predicted when we know $X$. This is the complementary proportion of a "residual variance ratio," which is a proportional measure of the variance in $Y$ that remains when we know $X$.
+
+The above are population parameters imagining a normal model of $Y$ conditional on $X$ and assuming a linear, homoscedastic relationship between $X$ and $Y$. However, there are also equivalent *sample statistics* that we can *calculate* to *describe* the linear relationship between these two variables in a sample:
+
++ $\bar{y}$: Mean of $Y$, which has a linear relationship with $X$: $\bar{y}_i=a+b x_i$;
++ $a$: Y-intercept of $\bar{y}$ (i.e., the value of $\bar{y}_i$ when $x_i=0$);
++ $b$: the slope of $X$, i.e., the amount by which $\bar{y}$ changes for each unit increase (+1) in $X$;
++ $s_y$: the constant dispersion (expressed as a standard deviation) of $Y$ conditional on knowing $X$. This statistic is assumed to have no relationship with $X$ (which may be an unsafe assumption in many realworld data-analytic contexts).
++ $r$: The correlation coefficient, ranging between -1 and 1. Negative values indicate a negative linear relationship between $X$ and $Y$ ($\bar{y}$ decreases as $X$ increases), while positive values indicate a positive linear relationship ($\bar{y}$ increases as $X$ increases). $r=0$ indicates a "null" direction ($\bar{y}$ does not change as $X$ increases; this is an exceedingly rare value in data-analytic contexts). Values of $r$ further away from 0 (i.e., toward -1 or +1) indicate stronger relationships.
++ $r^2$: The "coefficient of determination" (though "determination" is misleading if we are talking about associations rather than cause-effect relationships). This statistic varies between 0 and 1 and constitutes a proportional measure of how much *sample* variance in $Y$ ($s_y^2$) is predicted when we know $X$. This is the complementary proportion of a "residual variance ratio," which is a proportional measure of the *sample* variance in $Y$ that remains when we know $X$.
+
+In inferential contexts, we use these sample statistics as point estimates of their corresponding population parameters, **but we can also regard them simply as descriptive tools, and that is what we will do in this tutorial**.
+
+The important question is, what algorithmic framework can we use to calculate or determine these statistics? The ordinary least squares (OLS) framework does so by finding the values of that minimize the squared residuals:
+
+$$
+\{a,b\}_{OLS}=
+\underset{A,B}{\arg\min}
+  \sum_{i=1}^n\left(y_i-(a+b x_i)\right)^2
+$$
+
+This equation states that the calculation of $a$ and $b$ is accomplished by minimizing the sum of squared residuals over the domains of $a$ ($A$) and of $b$ ($B$). Minimizing this value is equivalent to minimizing the sample variance of $Y$, $s_y^2$, when $X$ is known.
+
+In theory, there are many different approaches we could take to solving this minimization problem, including computationally intensive approaches that pose a very large number of random guesses at $a$ and $b$, favoring the guess that implies the lowest sum of squared residuals. However, the OLS algorithm solves these problems by calculating $a$, $b$, $s_y$, $r$, and $r^2$ exactly. We will review these closed-form solutions in lecture. The important point here is that we can use a function in R to do all the calculations for us: `lm()` (an abbreviation for linear regression model).
+
+This function has one key argument we will focus on: `formula`. In general, formulas can be written with the general form `DV ~ IV1 + IV2 + ...`, where `DV` is a placeholder for the dependent variable usually stored as a column of a data frame, and each term `IVn` is a placeholder for the name of the *n*th independent variable. There is a more complex syntax to R regression formulas, but for the moment, we will focus on the simple case of a single numerical predictor. Also note that we can supply data to `lm()` either using  a `data` argument in the function or else passing the data into the function using the tidyverse pipe operator:
+
+```{r}
+mod1 <- lm(
+  formula = LogViralLoad ~ Dose,
+  data = fishDat
+)
+
+mod2 <- fishDat %>% 
+  lm(
+    formula = LogViralLoad ~ Dose
+  )
+```
+
+Calling the model name will display a very bare-bones summary of the fitted regression model, repeating the `lm()` function call and reporting calculated values of $a$ and $b$:
+
+```{r}
+mod1
+
+mod2
+```
+
+A more thorough report of the fitted model can be produced using base R's multipurpose function `summary()`:
+
+```{r}
+summary(mod1)
+```
+
+We will focus on how to read many of the parts of this output later in the quarter when discussing inference. We can also pull out the intercept and slope(s) of the linear model using the `coefficients()` function (which can actually be abbreviate `coef()`), and the sample standard deviation with the `sigma()` function (named this because the sample standard deviation is often used as a point estimate of the population standard deviation).
+
+```{r}
+coefficients(mod1)
+
+coef(mod2)
+
+sigma(mod1)
+```
+
+The output of `lm()` is a `list` type:
+
+```{r}
+str(mod1)
+```
+
+Lists are compound object types that consist of a combination of subordinate objects, which can be of many different types: scalars, vectors, matrices, arrays, data frames, graphs, or even further lists. The different parts of a list can be indexed in one of two ways:
+
++ `listName[[index]]` where `listName` is a placeholder for the name of the list object and `index` is a placeholder for the number of the part;
++ `listName$elementName`, where `elementName` is a placeholder for the name of one of the elements in the list.
+
+When we know how `lm()` objects are structured, we can pull out all of the basic statistics we desire. For example, if we wish for a vector of residuals (sorted in the same order as the inputted data):
+
+```{r}
+glimpse(mod1$residuals)
+```
+
+The following block creates a scatterplot that includes both observed and fitted values of $Y$, as well as a trendline using the `geom_abline()` function.
+
+```{r}
+# Histogram of residuals
+data.frame(resids = mod1$residuals) %>% 
+  ggplot(mapping = aes(x = resids)) +
+  geom_histogram()
+
+# Scatterplot of observed and fitted values of viral load
+data.frame(
+  Dose = mod1$model$Dose, # Note the double indexing with two $
+  Load = mod1$fitted.values # estimates of y-bar for each i
+  ) %>% 
+ggplot(mapping = aes(x = jitter(Dose), y = jitter(Load))) +
+geom_point(col = 2) + # plots fitted values
+geom_point( # Plots observed values
+  data = fishDat,
+  mapping = aes(x = jitter(Dose, factor = .25), LogViralLoad)
+) +
+geom_abline(
+  intercept = coef(mod1)[1], # a or Y-intercept
+  slope = coef(mod1)[2], # b or slope
+  col = 2
+)
+```
+
+Inputting the fitted regression model object into the summary function also derives a new list from this, providing another way of accessing objects that represent the statistical measures of the linear relationship:
+
+```{r}
+summary(mod1)$coef
+
+summary(mod1)$sigma
+
+summary(mod1)$r.squared
+```
+
+The chunk below creates multiple "stratified" regression models (i.e., fitted to conditional subsets of data), focusing on how the linear relationship between dose and load might vary between viral strains.
+
+```{r}
+modU <- fishDat %>% 
+  filter(Strain == "U") %>% 
+  lm(formula = LogViralLoad ~ Dose)
+
+modM <- fishDat %>% 
+  filter(Strain == "M") %>% 
+  lm(formula = LogViralLoad ~ Dose)
+
+modL <- fishDat %>% 
+  filter(Strain == "L") %>% 
+  lm(formula = LogViralLoad ~ Dose)
+
+fishDat %>% 
+  filter(!is.na(LogViralLoad)) %>% 
+  ggplot(mapping = aes(
+    x = jitter(Dose, factor = .25), y = LogViralLoad, col = Strain
+  )) +
+  geom_point() +
+  xlab("Log Viral Dose") +
+  ylab("Log Viral Load") +
+  geom_abline(
+    intercept = coef(modL)[1],
+    slope = coef(modL)[2],
+    col = 2 # note the color sequence starts with 2; "1" is black
+  )  +
+  geom_abline(
+    intercept = coef(modM)[1],
+    slope = coef(modM)[2],
+    col = 3
+  ) +
+  geom_abline(
+    intercept = coef(modU)[1],
+    slope = coef(modU)[2],
+    col = 4
+  )
+
+```
+
+In the chunk below, fit separate models for each level of one of the blocking variables---run type (spring/stream vs. fall/ocean) or CRB population source (lower vs. upper)---then generate a scatterplot that is color- or shape-coded to reflect these different blocks, and add trendlines to this plot that characterize the changing linear relationship between viral dose and load as this varies between sample blocks.
+
+```{r}
+
+```
+

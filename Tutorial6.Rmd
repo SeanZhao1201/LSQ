@@ -1,0 +1,304 @@
+---
+title: "STAT 311 (AU25): Tutorial 6"
+author: "[Student Name Goes Here]"
+date: "`r Sys.time()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(knitr) # Used for a kable() table
+```
+
+# Programming functions
+
+One of the strengths of `R` is our ability to program new functions, which is especially useful when we want to repeatedly perform critical calculations or execute the same algorithms under different conditions in a way that is not supported by "out of the box" functions in `R`'s base packages or in other packages we download. Programming functions follows the generic form below:
+
+```{r, eval=FALSE}
+fun <- function(arg1, arg2, etc.){
+  # R code goes here
+  return(...)
+}
+```
+
+In the code above, we program a new function using the `function()` function. This new function will be called `fun()`. We can specify which arguments the new `fun()` function will take by listing these out as arguments in the `function()` function, e.g., `arg1` and `arg2` the code above. Usually, we follow the `function()` function with open and close braces, `{` and `}`. What goes inside of these braces will be one or more lines of `R` code, which will be run every time we call the function. Finally, when we wish to explicitly define the output that the function will return when we call it, we end the code in braces with the `return()` function.
+
+For example, the following function takes two values `a` and `b` as arguments and calculates the ratio of the smaller to the larger value (allowing negative-valued arguments):
+
+$$
+\frac{\min(a,b)}{\max(a,b)}
+$$
+
+```{r}
+LittleBigRatio <- function(a,b){
+  if (!is.numeric(a) | !is.numeric(b)) {
+    print(noquote("'a' and 'b' must be numeric."))
+    out <- NA
+  } else {
+    sorted_ab_vec <- sort(c(a,b))
+    out <- sorted_ab_vec[1]/sorted_ab_vec[2]
+  }
+  return(out)
+}
+```
+
+```{r}
+test1 <- LittleBigRatio(50, 200)
+test1
+test2 <- LittleBigRatio(200, 50)
+test2
+test3 <- LittleBigRatio(-200, 50)
+test3
+test4 <- LittleBigRatio(-200, -50)
+test4
+test5 <- LittleBigRatio(200, -50)
+test5
+test6 <- LittleBigRatio("apple", "banana")
+test6
+```
+
+Note that this function also uses code that has the generic form `if(condition){code to run if condition is met}else{code to run if condition is not met}`. This allows us to execute different code depending on whether a particular condition is met or not. The argument of the `if()` function must be a logical scalar (i.e., a single `TRUE` or `FALSE` or else a logical expression that evaluates to a single `TRUE` or `FALSE`). If this scalar is `TRUE`, the code in the first set of braces following the `if()` function will run. If it is `FALSE`, the code in the second set of braces following `else` will run.
+
+This function is demonstrated below:
+
+```{r}
+test1 <- LittleBigRatio(50, 200)
+test1
+test2 <- LittleBigRatio(200, 50)
+test2
+test3 <- LittleBigRatio(-200, 50)
+test3
+test4 <- LittleBigRatio(-200, -50)
+test4
+test5 <- LittleBigRatio(200, -50)
+test5
+test6 <- LittleBigRatio("apple", "banana")
+test6
+```
+
+Note that when the object `test6` is created, the warning message is printed but not stored; only `NA` is assigned to this object. When `test6` is then called, it returns the value `NA` but does not print the warning message.
+
+In the chunk below, create a new function called `PercentChange` that returns the percent change from an old or initial value `a` to a new value `b`---
+
+$$
+\text{percent change}
+=
+\frac{b-a}{a} \times 100
+$$
+
+---and demonstrate that this works using two positive values for `a` and `b`.
+
+```{r}
+
+```
+
+# More on simulation and probability experiments
+
+The two functions programmed below (A) calculate the **probability density function** (**pdf**) for and (B) create a **random number generator** (**RNG**) for a probability distribution model known as the Siler model. This model is sometimes used by biodemographers, archaeological demographers, and wildlife demographers to model the age schedule of mortality for humans and other animals. This is a complex model with three concentration (or "rate") parameters ($\lambda_1$, $\lambda_2$, and $\lambda_3$, all strictly positive) and two shape parameters ($\kappa_1$ and $\kappa_3$, all strictly positive).^[In theory, there is another shape parameter, $\kappa_2$, but this is set to 0.] the pdf is complicated and *will not be interpreted fully here* but has the following form:
+
+$$
+\begin{matrix}
+p\left(
+  a
+  \mid
+  \lambda_1,\kappa_1,\lambda_2,\lambda_3,\kappa_3
+\right) \\
+= \\
+\left(
+  \lambda_1 e^{-\kappa_1a} +
+  \lambda_2 +
+  \lambda_3 e^{\kappa_3 a}
+\right)
+\times
+\exp\left(
+  -\frac{\lambda_1}{\kappa_1}\left(
+    1-e^{-\kappa_1 a}
+  \right)
+  - \lambda_2 a
+  + \frac{\lambda_3}{\kappa_3}\left(
+    1-e^{\kappa_3 a}
+  \right)
+\right)
+\end{matrix}
+$$
+
+**Do not dwell on the functions below; the goal is to use them!!!** Note that the parameter arguments for this pdf are set to approximate the age schedule of mortality for the Swedish population from the first decade of the 1900s. However, this function can still be used by replacing these values with other values of the user's choosing.
+
+```{r}
+# pdf for the Siler model, with default parameter values 
+# set to approximate the age schedule of mortality for 
+# Sweden from the 1st decade of the 1900s
+dSiler <- function(
+  a,
+  lambda1 = 0.1494682,
+  kappa1 = 1.319268,
+  lambda2 = 0.002830802,
+  lambda3 = 0.00001767291,
+  kappa3 = 0.1024555
+){
+  hazard.a <- lambda1*exp(-kappa1*a) +
+    lambda2 +
+    lambda3*exp(kappa3*a)
+  
+  survival.a <- exp(
+    -lambda1/kappa1*(1-exp(-kappa1*a))
+    -lambda2*a
+    +lambda3/kappa3*(1-exp(kappa3*a))
+  )
+  
+  out <- hazard.a*survival.a
+  
+  return(out)
+}
+
+# Creates a data frame to plot the Sweden mortality model
+Sweden1900.1910Siler <-
+  data.frame(
+    a = seq(0,150,0.01)
+  ) %>% mutate(
+    Siler.pdf = dSiler(a)
+  )
+
+Sweden1900.1910Siler %>% 
+  ggplot(mapping = aes(x = a, y = Siler.pdf)) +
+  geom_line()
+```
+
+Next, the RNG is programmed. Once again, **do not dwell on the contents of this function!!!** Also note that one component of this function will generate `NaN` ("not a number") because of a potential for expressions with undefined solutions. This will result in a warning statement that can actually be ignored.
+
+```{r}
+# RNG for the Siler model, with default parameter values 
+# set to approximate the age schedule of mortality for 
+# Sweden from the 1st decade of the 1900s
+rSiler <- function(
+  n, # Number of observations to simulate
+  lambda1 = 0.1494682,
+  kappa1 = 1.319268,
+  lambda2 = 0.002830802,
+  lambda3 = 0.00001767291,
+  kappa3 = 0.1024555
+){
+  # Siler potential lifespan simulation, produces NaN's
+  a.Siler <- -log(log(runif(n))*kappa1/lambda1+1)/kappa1
+  a.Siler[is.nan(a.Siler)] <- Inf
+  
+  # Makeham potential lifespan simulation
+  a.Makeham <- -log(runif(n))/lambda2
+
+  # Gompertz potential lifespan simulation
+  a.Gompertz <- log(1-log(runif(n))*kappa3/lambda3)/kappa3
+
+  # Select smallest potential lifespan
+  out <- apply(
+    X = cbind(a.Siler, a.Makeham, a.Gompertz),
+    MARGIN = 1,
+    FUN = min
+    )
+  
+  return(out)
+}
+
+set.seed(2025-12-2)
+testSim <- rSiler(n = 100000)
+
+data.frame(a = testSim) %>% 
+  ggplot(mapping = aes(x = a)) +
+  geom_histogram(
+    mapping = aes(y = after_stat(density)),
+    breaks = seq(0, 150, 1)
+  ) +
+  geom_line(
+    data = Sweden1900.1910Siler,
+    mapping = aes(x = a, y = Siler.pdf),
+    col = "blue"
+  ) +
+  xlim(0, 150)
+```
+
+The sample mean $\bar{a}$ of the 100000 cases simulated above is
+
+```{r}
+mean(testSim)
+```
+
+In the chunk below, a $n$-by-$J$ matrix is produced where sample size is set to $n=5$ and $J=1000$ unique samples are simulated. The sample mean for each small sample is then calculated:
+
+```{r}
+nSmall <- 5; J <- 1000
+swedenSamples <- matrix(
+  data = rSiler(n = nSmall*J),
+  nrow = nSmall,
+  ncol = J
+)
+
+smallSampleMeans <- colMeans(swedenSamples)
+
+data.frame(a.bar = smallSampleMeans) %>% 
+  ggplot(mapping = aes(x = a.bar)) +
+  geom_histogram(breaks = seq(0, 100, 10)) +
+  geom_vline(xintercept = mean(testSim), col = "blue")
+```
+
+In the chunk below, re-run this simulation, changing sample size (`nLarge`) to 1000, and draw a histogram of the results.
+
+```{r}
+
+```
+
+[A 2007 study published by bioanthropologists Michael Gurven and Hillard Kaplan](https://doi.org/10.1111/j.1728-4457.2007.00171.x) suggests the following parameters for an "average" hunter-gather population, based on ethno-demographic fieldwork among a handful of historical hunter-gather populations:
+
+$$
+\{
+  \lambda_1=0.422,\kappa_1=1.131,
+  \lambda_2=0.013,
+  \lambda_3=0.000147,\kappa_3=0.086
+\}
+$$
+
+The chunk below illustrates the pdf for this synthetic model of hunter-gather ("hg") mortality in black and contrasts it with the Swedish mortality model in blue.
+
+```{r}
+lambda1_hg=0.422; kappa1_hg=1.131
+lambda2_hg=0.013
+lambda3_hg=0.000147; kappa3_hg=0.086
+
+# Creates a data frame to plot the Sweden mortality model
+HG.Siler <-
+  data.frame(a = seq(0,150,0.01)) %>%
+  mutate(
+    Siler.pdf = dSiler(
+      a = a,
+      lambda1 = lambda1_hg, kappa1 = kappa1_hg,
+      lambda2 = lambda2_hg,
+      lambda3 = lambda3_hg, kappa3 = kappa3_hg
+    )
+  )
+
+HG.Siler %>% 
+  ggplot(mapping = aes(x = a, y = Siler.pdf)) +
+  geom_line() +
+  geom_line(
+    data = Sweden1900.1910Siler,
+    mapping = aes(x = a, y = Siler.pdf),
+    col = "blue"
+  )
+```
+
+
+In the chunk below:
+
++ use the `rSiler()` function to create $J=1000$ samples of small ($n=5$) samples in an $n$-by-$J$ matrix as above, reusing `J` and `nSmall` that you created above and using the hunter-gatherer parameters given in the previous chunk;
++ calculate the sample means using the `colMeans()` function, as above, storing the results as a vector called `smallSampleMeans_hg`;
++ calculate the difference between the sample means for the Swedish and hunter-gatherer samples you simulated above ($\bar{a}_{Swedish}-\bar{a}_{hg}$), storing the results as a vector called `difMeans`;
++ calculate the mean of sample means for the Swedish samples, THEN calculate the mean of sample means for the hunter-gatherer samples, THEN calculated the difference of these means, calling this `dimMeanOfMeans`.
++ draw a histogram of `difMeans`, adding a vertical line (`geom_vline()`) with an x-intercept set to `dimMeanOfMeans`, shaded in red or blue.
+
+```{r}
+
+```
+
+While the life expectancy of the synthetic hunter-gatherer mortality model is lower than that of the Swedish mortality model, what proportion of small-sample means of hunter-gatherer samples are greater than small-sample means of Swedish samples?
