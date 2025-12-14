@@ -171,7 +171,18 @@ fishDat %>%
 In the chunk below, prepare a scatterplot of viral dose and viral load as above, but code according to one of the other categorical variabes. Also, change the `factor` argument in `jitter()` so you can observe the effect of this on the degree of noise in *X*. If you include the `pch` argument in the `aes()` function and set it to equal (`=`) another variable, this will shape-code the scatterplot, as well. Add this argument to `aes()` in the chunk below to change the shape of the points to reflect one of the other categorical variables. (`pch` is an abbreviation for "point character".)
 
 ```{r}
-
+fishDat %>%
+  filter(!is.na(LogViralLoad)) %>%
+  ggplot(mapping = aes(
+    x = jitter(Dose, factor = 0.5),  # Increased jitter factor
+    y = LogViralLoad,
+    col = Strain,       # Color-coded by viral strain
+    pch = RunType       # Shape-coded by run type (Spring/Stream vs Fall/Ocean)
+  )) +
+  geom_point(size = 2) +
+  xlab("Log Viral Exposure Dose") +
+  ylab("Log Viral Load") +
+  labs(color = "Viral Strain", shape = "Run Type")
 ```
 
 
@@ -344,6 +355,40 @@ fishDat %>%
 In the chunk below, fit separate models for each level of one of the blocking variables---run type (spring/stream vs. fall/ocean) or CRB population source (lower vs. upper)---then generate a scatterplot that is color- or shape-coded to reflect these different blocks, and add trendlines to this plot that characterize the changing linear relationship between viral dose and load as this varies between sample blocks.
 
 ```{r}
+# Fit separate models for each level of RunType (blocking variable)
+modSpringStream <- fishDat %>%
+  filter(RunType == "Spring/Stream") %>%
+  lm(formula = LogViralLoad ~ Dose)
 
+modFallOcean <- fishDat %>%
+  filter(RunType == "Fall/Ocean") %>%
+  lm(formula = LogViralLoad ~ Dose)
+
+# Display model coefficients
+coef(modSpringStream)
+coef(modFallOcean)
+
+# Create scatterplot with color-coding by RunType and trendlines
+fishDat %>%
+  filter(!is.na(LogViralLoad)) %>%
+  ggplot(mapping = aes(
+    x = jitter(Dose, factor = 0.25),
+    y = LogViralLoad,
+    col = RunType
+  )) +
+  geom_point() +
+  xlab("Log Viral Dose") +
+  ylab("Log Viral Load") +
+  geom_abline(
+    intercept = coef(modFallOcean)[1],
+    slope = coef(modFallOcean)[2],
+    col = 2  # Color for Fall/Ocean
+  ) +
+  geom_abline(
+    intercept = coef(modSpringStream)[1],
+    slope = coef(modSpringStream)[2],
+    col = 3  # Color for Spring/Stream
+  ) +
+  labs(color = "Run Type")
 ```
 
