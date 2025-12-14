@@ -93,7 +93,26 @@ $$
 ---and demonstrate that this works using two positive values for `a` and `b`.
 
 ```{r}
+# Create the PercentChange function
+PercentChange <- function(a, b) {
+  if (!is.numeric(a) | !is.numeric(b)) {
+    print(noquote("'a' and 'b' must be numeric."))
+    out <- NA
+  } else if (a == 0) {
+    print(noquote("'a' cannot be zero (division by zero)."))
+    out <- NA
+  } else {
+    out <- ((b - a) / a) * 100
+  }
+  return(out)
+}
 
+# Demonstrate with two positive values
+test_pc1 <- PercentChange(50, 75)  # From 50 to 75
+test_pc1  # Should return 50% increase
+
+test_pc2 <- PercentChange(100, 150)  # From 100 to 150
+test_pc2  # Should return 50% increase
 ```
 
 # More on simulation and probability experiments
@@ -246,7 +265,24 @@ data.frame(a.bar = smallSampleMeans) %>%
 In the chunk below, re-run this simulation, changing sample size (`nLarge`) to 1000, and draw a histogram of the results.
 
 ```{r}
+# Re-run simulation with larger sample size
+nLarge <- 1000; J <- 1000
 
+swedenSamplesLarge <- matrix(
+  data = rSiler(n = nLarge * J),
+  nrow = nLarge,
+  ncol = J
+)
+
+largeSampleMeans <- colMeans(swedenSamplesLarge)
+
+# Draw histogram of results
+data.frame(a.bar = largeSampleMeans) %>%
+  ggplot(mapping = aes(x = a.bar)) +
+  geom_histogram(breaks = seq(30, 60, 2)) +
+  geom_vline(xintercept = mean(testSim), col = "blue") +
+  xlab("Sample Mean Age at Death") +
+  ggtitle("Sampling Distribution with n = 1000")
 ```
 
 [A 2007 study published by bioanthropologists Michael Gurven and Hillard Kaplan](https://doi.org/10.1111/j.1728-4457.2007.00171.x) suggests the following parameters for an "average" hunter-gather population, based on ethno-demographic fieldwork among a handful of historical hunter-gather populations:
@@ -298,7 +334,44 @@ In the chunk below:
 + draw a histogram of `difMeans`, adding a vertical line (`geom_vline()`) with an x-intercept set to `dimMeanOfMeans`, shaded in red or blue.
 
 ```{r}
+# Create J=1000 samples of small (n=5) samples using hunter-gatherer parameters
+hgSamples <- matrix(
+  data = rSiler(
+    n = nSmall * J,
+    lambda1 = lambda1_hg, kappa1 = kappa1_hg,
+    lambda2 = lambda2_hg,
+    lambda3 = lambda3_hg, kappa3 = kappa3_hg
+  ),
+  nrow = nSmall,
+  ncol = J
+)
 
+# Calculate sample means for hunter-gatherer samples
+smallSampleMeans_hg <- colMeans(hgSamples)
+
+# Calculate the difference between Swedish and hunter-gatherer sample means
+difMeans <- smallSampleMeans - smallSampleMeans_hg
+
+# Calculate the difference of means of means
+dimMeanOfMeans <- mean(smallSampleMeans) - mean(smallSampleMeans_hg)
+dimMeanOfMeans
+
+# Draw histogram of difMeans with vertical line at dimMeanOfMeans
+data.frame(diff = difMeans) %>%
+  ggplot(mapping = aes(x = diff)) +
+  geom_histogram(breaks = seq(-60, 80, 5)) +
+  geom_vline(xintercept = dimMeanOfMeans, col = "red", linewidth = 1) +
+  xlab("Difference in Sample Means (Swedish - Hunter-Gatherer)") +
+  ggtitle("Distribution of Differences in Small-Sample Means")
 ```
 
 While the life expectancy of the synthetic hunter-gatherer mortality model is lower than that of the Swedish mortality model, what proportion of small-sample means of hunter-gatherer samples are greater than small-sample means of Swedish samples?
+
+```{r}
+# Calculate the proportion of cases where hunter-gatherer sample means
+# are greater than Swedish sample means (i.e., difMeans < 0)
+proportion_hg_greater <- mean(difMeans < 0)
+proportion_hg_greater
+```
+
+The proportion of small-sample means where hunter-gatherer samples are greater than Swedish samples is calculated above. This represents the cases where `difMeans < 0` (meaning Swedish - HG is negative, so HG > Swedish).

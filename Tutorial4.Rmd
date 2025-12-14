@@ -313,7 +313,22 @@ dat %>%
 In the chunk below, create a frequency distribution and corresponding histogram for annual energy consumption (kWh). you might first consider using the `range()` function with this variable to identify minimum and maximum values observed for this variable when you choose appropriate breaks for the frequency distribution and histogram.
 
 ```{r}
+# First, check the range of energy consumption values
+range(dat$energy.kWh)
 
+# Create frequency distribution for annual energy consumption
+table(cut(
+  dat$energy.kWh,
+  breaks = seq(0, 40000, 2000)  # Based on the typical range of energy values
+))
+
+# Create histogram for annual energy consumption
+dat %>%
+  ggplot(mapping = aes(x = energy.kWh)) +
+  geom_histogram(
+    breaks = seq(0, 40000, 2000)
+  ) +
+  xlab("Annual Energy Consumption (kWh)")
 ```
 
 Note that the count axis (i.e., Y axis) of a histogram can be adjusted to show the proportional density of each bin rather than the count ($k$):
@@ -465,9 +480,25 @@ dat %>%
   ylab("Distance from city core (below/above Q2)")
 ```
 
-In the chunk below, prepare one boxplot describing variability in energhy use (kWh/year) overall, and a second comparing variability in energy use for “near” and “far” households.
+In the chunk below, prepare one boxplot describing variability in energhy use (kWh/year) overall, and a second comparing variability in energy use for "near" and "far" households.
 
 ```{r}
+# Boxplot 1: Overall variability in energy use
+dat %>%
+  ggplot(mapping = aes(x = energy.kWh)) +
+  geom_boxplot() +
+  xlab("Annual Energy Consumption (kWh/year)") +
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
 
+# Boxplot 2: Comparing energy use between "Near" and "Far" households
+dat %>%
+  ggplot(mapping = aes(x = energy.kWh, y = distance.ord)) +
+  geom_boxplot() +
+  xlab("Annual Energy Consumption (kWh/year)") +
+  ylab("Distance from city core (below/above Q2)")
 ```
 
